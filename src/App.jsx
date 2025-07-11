@@ -426,6 +426,7 @@ export default function App() {
             <input
               type="file"
               accept="image/*"
+              capture="environment"
               onChange={(e) =>
                 setFormData({
                   ...formData,
@@ -446,6 +447,7 @@ export default function App() {
             <input
               type="file"
               accept="image/*"
+              capture="environment"
               onChange={(e) =>
                 setFormData({
                   ...formData,
