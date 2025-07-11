@@ -475,6 +475,7 @@ export default function App() {
                   <input
                     type="text"
                     value={screen.name}
+                    capture="environment"
                     onChange={(e) => updateScreen(idx, "name", e.target.value)}
                     placeholder={`Screen ${idx + 1} name`}
                     style={styles.screenInput}
@@ -484,6 +485,7 @@ export default function App() {
                   <input
                     type="file"
                     accept="image/*"
+                    capture="environment"
                     onChange={(e) => updateScreen(idx, "serialPic", e.target.files[0])}
                     style={styles.fileInput}
                     required
@@ -492,6 +494,7 @@ export default function App() {
                   <input
                     type="file"
                     accept="image/*"
+                    capture="environment"
                     onChange={(e) => updateScreen(idx, "boxPic", e.target.files[0])}
                     style={styles.fileInput}
                     required
