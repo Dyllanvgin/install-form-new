@@ -180,7 +180,6 @@ export default function App() {
 
   const BACKEND_URL = "https://monday-file-backend.onrender.com";
 
-  // Upload file via your backend server
   async function uploadFileToBackend(file, client, itemId) {
     const clientInfo = CLIENTS[client];
     if (!clientInfo) throw new Error("Invalid client");
@@ -190,7 +189,6 @@ export default function App() {
     const formData = new FormData();
     formData.append("file", file);
 
-    // Append item_id and column_id as query parameters in the URL
     const url = new URL(`${BACKEND_URL}/upload`);
     url.searchParams.append("item_id", itemId);
     url.searchParams.append("column_id", fileColumnId);
@@ -214,7 +212,6 @@ export default function App() {
     return result.data.add_file_to_column.id;
   }
 
-  // Call backend to create main item
   async function createMainItem(boardId, itemName) {
     const response = await fetch(`${BACKEND_URL}/create-item`, {
       method: "POST",
@@ -236,7 +233,6 @@ export default function App() {
     return result.data.create_item.id;
   }
 
-  // Call backend to create subitem
   async function createSubitem(parentItemId, itemName) {
     const response = await fetch(`${BACKEND_URL}/create-subitem`, {
       method: "POST",
@@ -291,17 +287,19 @@ export default function App() {
 
       const clientInfo = CLIENTS[data.client];
       const boardId = clientInfo.boardId;
-      const fileColId = clientInfo.fileColumnId;
 
-      // Create main item via backend
       const mainItemId = await createMainItem(boardId, data.storeName);
 
-      // If no subitems wanted and boxPic on first screen, upload & attach file via backend
-      if (!data.subitemsWanted && data.screens.length > 0 && data.screens[0].boxPic) {
-        await uploadFileToBackend(data.screens[0].boxPic, data.client, mainItemId);
+      if (!data.subitemsWanted && data.screens.length > 0) {
+        // Upload serialPic and boxPic both if they exist for the first screen
+        if (data.screens[0].serialPic) {
+          await uploadFileToBackend(data.screens[0].serialPic, data.client, mainItemId);
+        }
+        if (data.screens[0].boxPic) {
+          await uploadFileToBackend(data.screens[0].boxPic, data.client, mainItemId);
+        }
       }
 
-      // If subitems wanted, create subitems with uploaded files attached via backend
       if (data.subitemsWanted) {
         for (const screen of data.screens) {
           const subitemId = await createSubitem(mainItemId, screen.name || "Unnamed Screen");
@@ -328,9 +326,8 @@ export default function App() {
       } else if (err) {
         try {
           message = JSON.stringify(err, null, 2);
-        } catch {
-          // fallback to default message
-        }
+        } catch {}
+
       }
 
       setError(message);
@@ -425,6 +422,26 @@ export default function App() {
 
         {!formData.subitemsWanted && (
           <>
+            <label style={styles.label}>Serial Number Photo</label>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  screens: [
+                    {
+                      name: formData.storeName,
+                      serialPic: e.target.files[0],
+                      boxPic: formData.screens.length > 0 ? formData.screens[0].boxPic : null,
+                    },
+                  ],
+                })
+              }
+              style={styles.fileInput}
+              required
+            />
+
             <label style={styles.label}>Box Photo Upload</label>
             <input
               type="file"
@@ -435,7 +452,7 @@ export default function App() {
                   screens: [
                     {
                       name: formData.storeName,
-                      serialPic: null,
+                      serialPic: formData.screens.length > 0 ? formData.screens[0].serialPic : null,
                       boxPic: e.target.files[0],
                     },
                   ],
