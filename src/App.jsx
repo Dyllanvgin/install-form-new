@@ -436,21 +436,7 @@ export default function App() {
           required
         />
 
-        {/* New checkbox for sending files to subitem */}
-        {formData.subitemsWanted && (
-          <div style={styles.checkboxRow}>
-            <input
-              type="checkbox"
-              id="sendFileToSubitem"
-              checked={formData.sendFileToSubitem}
-              onChange={(e) => setFormData({ ...formData, sendFileToSubitem: e.target.checked })}
-            />
-            <label htmlFor="sendFileToSubitem" style={styles.checkboxLabel}>
-              Send files to subitem
-            </label>
-          </div>
-        )}
-
+      
         <div style={styles.checkboxRow}>
           <input
             type="checkbox"
