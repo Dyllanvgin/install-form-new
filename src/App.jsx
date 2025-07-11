@@ -132,46 +132,55 @@ const CLIENTS = {
   },
   Usave: {
     boardId: 4918008751,
+    subitemBoardId: 4918009127,
     fileColumnId: "files3",
     subitemFileColumnId: "files_mkmmyqrw",
   },
   BP: {
     boardId: 2040145285,
+    subitemBoardId: 3609338894,
     fileColumnId: "files__1",
     subitemFileColumnId: "file_mksrwj2t",
   },
   Goldwagen: {
     boardId: 8580549417,
+    subitemBoardId: 8580549442,
     fileColumnId: "files__1",
     subitemFileColumnId: "file_mksrdsz6",
   },
   "Sportsmans Warehouse": {
     boardId: 2040227054,
+    subitemBoardId: 2040227074,
     fileColumnId: "file_mks9j2ag",
     subitemFileColumnId: "file_mksrxkj4",
   },
   Petworld: {
     boardId: 2035898218,
+    subitemBoardId: 2035898237,
     fileColumnId: "file_mksqt1xb",
     subitemFileColumnId: "file_mksrv1m2",
   },
   Britos: {
     boardId: 2040213584,
+    subitemBoardId: 2040213604,
     fileColumnId: "file_mkp4c3bp",
     subitemFileColumnId: "file_mksr793n",
   },
   "V&A Waterfront": {
     boardId: 8589977804,
+    subitemBoardId: 8589977828,
     fileColumnId: "files",
     subitemFileColumnId: "file_mksrwj5e",
   },
   PNA: {
     boardId: 4858437792,
+    subitemBoardId: 4858437810,
     fileColumnId: "files",
     subitemFileColumnId: "file_mksr3qby",
   },
   "PnP Clothing": {
     boardId: 8165706664,
+    subitemBoardId: 9479333157,
     fileColumnId: "file_mknqx8v5",
     subitemFileColumnId: "file_mksrgsyt",
   },
@@ -324,12 +333,12 @@ export default function App() {
           // Determine which column ID to use for file upload:
           // If client is "OK Foods", always upload to main item fileColumnId (ignore checkbox)
           // Else, use sendFileToSubitem checkbox to decide
-          let columnIdToUse = clientInfo.fileColumnId; // default main item column id
+          let columnIdToUse = clientInfo.fileColumnId;
 
-          if (data.client !== "OK Foods" && data.sendFileToSubitem) {
-            // use subitemFileColumnId if present, fallback to main fileColumnId if missing
-            columnIdToUse = clientInfo.subitemFileColumnId || clientInfo.fileColumnId;
-          }
+if (data.client !== "OK Foods" && clientInfo.subitemFileColumnId) {
+  columnIdToUse = clientInfo.subitemFileColumnId;
+}
+
 
           if (screen.serialPic) {
             await uploadFileToBackend(screen.serialPic, data.client, subitemId, columnIdToUse);
