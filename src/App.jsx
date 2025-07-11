@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 
 const styles = {
+  // ... your existing styles here ...
   container: {
     minHeight: "100vh",
     backgroundColor: "#e0f2fe",
@@ -152,6 +153,7 @@ const CLIENTS = {
   Petworld: {
     boardId: 2035898218,
     fileColumnId: "file_mksqt1xb",
+    subitemFileColumnId: "file_mksrv1m2",
   },
   Britos: {
     boardId: 2040213584,
@@ -161,14 +163,17 @@ const CLIENTS = {
   "V&A Waterfront": {
     boardId: 8589977804,
     fileColumnId: "files",
+    subitemFileColumnId: "file_mksrwj5e",
   },
   PNA: {
     boardId: 4858437792,
     fileColumnId: "files",
+    subitemFileColumnId: "file_mksr3qby",
   },
   "PnP Clothing": {
     boardId: 8165706664,
     fileColumnId: "file_mknqx8v5",
+    subitemFileColumnId: "file_mksrgsyt",
   },
 };
 
@@ -178,6 +183,7 @@ export default function App() {
     storeName: "",
     screens: [],
     subitemsWanted: false,
+    sendFileToSubitem: false, // new checkbox state
   });
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -185,19 +191,14 @@ export default function App() {
 
   const BACKEND_URL = "https://monday-file-backend.onrender.com";
 
-  async function uploadFileToBackend(file, client, itemId) {
-    const clientInfo = CLIENTS[client];
-    if (!clientInfo) throw new Error("Invalid client");
-
-    // Always use the main item's fileColumnId regardless of item type
-    const fileColumnId = clientInfo.fileColumnId;
-
+  async function uploadFileToBackend(file, client, itemId, columnId) {
+    // We pass columnId now explicitly (can be main or subitem column id)
     const formData = new FormData();
     formData.append("file", file);
 
     const url = new URL(`${BACKEND_URL}/upload`);
     url.searchParams.append("item_id", itemId);
-    url.searchParams.append("column_id", fileColumnId);
+    url.searchParams.append("column_id", columnId);
 
     const response = await fetch(url.toString(), {
       method: "POST",
@@ -297,12 +298,22 @@ export default function App() {
       const mainItemId = await createMainItem(boardId, data.storeName);
 
       if (!data.subitemsWanted && data.screens.length > 0) {
-        // Upload serialPic and boxPic both if they exist for the first screen
+        // Upload files to main item column only
         if (data.screens[0].serialPic) {
-          await uploadFileToBackend(data.screens[0].serialPic, data.client, mainItemId);
+          await uploadFileToBackend(
+            data.screens[0].serialPic,
+            data.client,
+            mainItemId,
+            clientInfo.fileColumnId
+          );
         }
         if (data.screens[0].boxPic) {
-          await uploadFileToBackend(data.screens[0].boxPic, data.client, mainItemId);
+          await uploadFileToBackend(
+            data.screens[0].boxPic,
+            data.client,
+            mainItemId,
+            clientInfo.fileColumnId
+          );
         }
       }
 
@@ -310,22 +321,21 @@ export default function App() {
         for (const screen of data.screens) {
           const subitemId = await createSubitem(mainItemId, screen.name || "Unnamed Screen");
 
-          if (data.client === "OK Foods") {
-            // Upload files to the subitem for OK Foods
-            if (screen.serialPic) {
-              await uploadFileToBackend(screen.serialPic, data.client, subitemId);
-            }
-            if (screen.boxPic) {
-              await uploadFileToBackend(screen.boxPic, data.client, subitemId);
-            }
-          } else {
-            // Upload files to the main item for all other clients
-            if (screen.serialPic) {
-              await uploadFileToBackend(screen.serialPic, data.client, mainItemId);
-            }
-            if (screen.boxPic) {
-              await uploadFileToBackend(screen.boxPic, data.client, mainItemId);
-            }
+          // Determine which column ID to use for file upload:
+          // If client is "OK Foods", always upload to main item fileColumnId (ignore checkbox)
+          // Else, use sendFileToSubitem checkbox to decide
+          let columnIdToUse = clientInfo.fileColumnId; // default main item column id
+
+          if (data.client !== "OK Foods" && data.sendFileToSubitem) {
+            // use subitemFileColumnId if present, fallback to main fileColumnId if missing
+            columnIdToUse = clientInfo.subitemFileColumnId || clientInfo.fileColumnId;
+          }
+
+          if (screen.serialPic) {
+            await uploadFileToBackend(screen.serialPic, data.client, subitemId, columnIdToUse);
+          }
+          if (screen.boxPic) {
+            await uploadFileToBackend(screen.boxPic, data.client, subitemId, columnIdToUse);
           }
         }
       }
@@ -372,6 +382,7 @@ export default function App() {
                 storeName: "",
                 screens: [],
                 subitemsWanted: false,
+                sendFileToSubitem: false,
               });
             }}
           >
@@ -412,18 +423,6 @@ export default function App() {
           ))}
         </select>
 
-        <div style={styles.checkboxRow}>
-          <input
-            type="checkbox"
-            id="subitemsWanted"
-            checked={formData.subitemsWanted}
-            onChange={(e) => setFormData({ ...formData, subitemsWanted: e.target.checked })}
-          />
-          <label htmlFor="subitemsWanted" style={styles.checkboxLabel}>
-            Subitems wanted
-          </label>
-        </div>
-
         <label htmlFor="storeName" style={styles.label}>
           Store Name
         </label>
@@ -436,6 +435,33 @@ export default function App() {
           style={styles.input}
           required
         />
+
+        {/* New checkbox for sending files to subitem */}
+        {formData.subitemsWanted && (
+          <div style={styles.checkboxRow}>
+            <input
+              type="checkbox"
+              id="sendFileToSubitem"
+              checked={formData.sendFileToSubitem}
+              onChange={(e) => setFormData({ ...formData, sendFileToSubitem: e.target.checked })}
+            />
+            <label htmlFor="sendFileToSubitem" style={styles.checkboxLabel}>
+              Send files to subitem
+            </label>
+          </div>
+        )}
+
+        <div style={styles.checkboxRow}>
+          <input
+            type="checkbox"
+            id="subitemsWanted"
+            checked={formData.subitemsWanted}
+            onChange={(e) => setFormData({ ...formData, subitemsWanted: e.target.checked })}
+          />
+          <label htmlFor="subitemsWanted" style={styles.checkboxLabel}>
+            Subitems wanted
+          </label>
+        </div>
 
         {!formData.subitemsWanted && (
           <>
@@ -492,7 +518,6 @@ export default function App() {
                   <input
                     type="text"
                     value={screen.name}
-                    capture="environment"
                     onChange={(e) => updateScreen(idx, "name", e.target.value)}
                     placeholder={`Screen ${idx + 1} name`}
                     style={styles.screenInput}
