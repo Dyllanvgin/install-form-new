@@ -132,18 +132,22 @@ const CLIENTS = {
   Usave: {
     boardId: 4918008751,
     fileColumnId: "files3",
+    subitemFileColumnId: "files_mkmmyqrw",
   },
   BP: {
     boardId: 2040145285,
     fileColumnId: "files__1",
+    subitemFileColumnId: "file_mksrwj2t",
   },
   Goldwagen: {
     boardId: 8580549417,
     fileColumnId: "files__1",
+    subitemFileColumnId: "file_mksrdsz6",
   },
   "Sportsmans Warehouse": {
     boardId: 2040227054,
     fileColumnId: "file_mks9j2ag",
+    subitemFileColumnId: "file_mksrxkj4",
   },
   Petworld: {
     boardId: 2035898218,
@@ -152,6 +156,7 @@ const CLIENTS = {
   Britos: {
     boardId: 2040213584,
     fileColumnId: "file_mkp4c3bp",
+    subitemFileColumnId: "file_mksr793n",
   },
   "V&A Waterfront": {
     boardId: 8589977804,
@@ -184,6 +189,7 @@ export default function App() {
     const clientInfo = CLIENTS[client];
     if (!clientInfo) throw new Error("Invalid client");
 
+    // Always use the main item's fileColumnId regardless of item type
     const fileColumnId = clientInfo.fileColumnId;
 
     const formData = new FormData();
@@ -304,11 +310,22 @@ export default function App() {
         for (const screen of data.screens) {
           const subitemId = await createSubitem(mainItemId, screen.name || "Unnamed Screen");
 
-          if (screen.serialPic) {
-            await uploadFileToBackend(screen.serialPic, data.client, subitemId);
-          }
-          if (screen.boxPic) {
-            await uploadFileToBackend(screen.boxPic, data.client, subitemId);
+          if (data.client === "OK Foods") {
+            // Upload files to the subitem for OK Foods
+            if (screen.serialPic) {
+              await uploadFileToBackend(screen.serialPic, data.client, subitemId);
+            }
+            if (screen.boxPic) {
+              await uploadFileToBackend(screen.boxPic, data.client, subitemId);
+            }
+          } else {
+            // Upload files to the main item for all other clients
+            if (screen.serialPic) {
+              await uploadFileToBackend(screen.serialPic, data.client, mainItemId);
+            }
+            if (screen.boxPic) {
+              await uploadFileToBackend(screen.boxPic, data.client, mainItemId);
+            }
           }
         }
       }
