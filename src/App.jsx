@@ -3,7 +3,7 @@ import React, { useState } from "react";
 const styles = {
   container: {
     minHeight: "100vh",
-    backgroundColor: "#e0f2fe", // lighter blue shade background
+    backgroundColor: "#e0f2fe",
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
@@ -54,9 +54,6 @@ const styles = {
     marginBottom: 24,
     backgroundColor: "#f9fafb",
   },
-  screenInputRow: {
-    marginBottom: 16,
-  },
   screenInput: {
     width: "100%",
     padding: 12,
@@ -103,16 +100,163 @@ const styles = {
     fontWeight: "bold",
     marginBottom: 32,
   },
+  errorMessage: {
+    textAlign: "center",
+    color: "#dc2626",
+    fontSize: 18,
+    marginBottom: 24,
+    whiteSpace: "pre-wrap",
+  },
+  loading: {
+    textAlign: "center",
+    fontSize: 18,
+    marginBottom: 24,
+  },
+  checkboxRow: {
+    display: "flex",
+    alignItems: "center",
+    marginBottom: 24,
+  },
+  checkboxLabel: {
+    marginLeft: 8,
+    fontSize: 18,
+    userSelect: "none",
+  },
+};
+
+const CLIENTS = {
+  "OK Foods": {
+    boardId: 8580538177,
+    fileColumnId: "files",
+  },
+  Usave: {
+    boardId: 4918008751,
+    fileColumnId: "files3",
+  },
+  BP: {
+    boardId: 2040145285,
+    fileColumnId: "files__1",
+  },
+  Goldwagen: {
+    boardId: 8580549417,
+    fileColumnId: "files__1",
+  },
+  "Sportsmans Warehouse": {
+    boardId: 2040227054,
+    fileColumnId: "file_mks9j2ag",
+  },
+  Petworld: {
+    boardId: 2035898218,
+    fileColumnId: "file_mksqt1xb",
+  },
+  Britos: {
+    boardId: 2040213584,
+    fileColumnId: "file_mkp4c3bp",
+  },
+  "V&A Waterfront": {
+    boardId: 8589977804,
+    fileColumnId: "files",
+  },
+  PNA: {
+    boardId: 4858437792,
+    fileColumnId: "files",
+  },
+  "PnP Clothing": {
+    boardId: 8165706664,
+    fileColumnId: "file_mknqx8v5",
+  },
 };
 
 export default function App() {
   const [formData, setFormData] = useState({
     client: "",
-    location: "",
     storeName: "",
-    screens: [], // each screen is { name, serialPic, boxPic }
+    screens: [],
+    subitemsWanted: false,
   });
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const BACKEND_URL = "https://monday-file-backend.onrender.com";
+
+  // Upload file via your backend server
+  async function uploadFileToBackend(file, client, itemId) {
+    const clientInfo = CLIENTS[client];
+    if (!clientInfo) throw new Error("Invalid client");
+
+    const fileColumnId = clientInfo.fileColumnId;
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    // Append item_id and column_id as query parameters in the URL
+    const url = new URL(`${BACKEND_URL}/upload`);
+    url.searchParams.append("item_id", itemId);
+    url.searchParams.append("column_id", fileColumnId);
+
+    const response = await fetch(url.toString(), {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errRes = await response.json().catch(() => ({}));
+      throw new Error(errRes.error || "File upload failed on backend");
+    }
+
+    const result = await response.json();
+
+    if (!result.data || !result.data.add_file_to_column) {
+      throw new Error(result.error || "File upload failed on backend");
+    }
+
+    return result.data.add_file_to_column.id;
+  }
+
+  // Call backend to create main item
+  async function createMainItem(boardId, itemName) {
+    const response = await fetch(`${BACKEND_URL}/create-item`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ boardId, itemName }),
+    });
+
+    if (!response.ok) {
+      const errRes = await response.json().catch(() => ({}));
+      throw new Error(errRes.error || "Create main item failed");
+    }
+
+    const result = await response.json();
+
+    if (!result.data || !result.data.create_item) {
+      throw new Error(result.error || "Create main item failed");
+    }
+
+    return result.data.create_item.id;
+  }
+
+  // Call backend to create subitem
+  async function createSubitem(parentItemId, itemName) {
+    const response = await fetch(`${BACKEND_URL}/create-subitem`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ parentItemId, itemName }),
+    });
+
+    if (!response.ok) {
+      const errRes = await response.json().catch(() => ({}));
+      throw new Error(errRes.error || "Create subitem failed");
+    }
+
+    const result = await response.json();
+
+    if (!result.data || !result.data.create_subitem) {
+      throw new Error(result.error || "Create subitem failed");
+    }
+
+    return result.data.create_subitem.id;
+  }
 
   const addScreen = () => {
     setFormData((prev) => ({
@@ -137,26 +281,83 @@ export default function App() {
     });
   };
 
-  const handleSubmit = () => {
-    // For testing: show collected data in console
-    console.log(formData);
-    setSubmitted(true);
+  const submitToBackend = async (data) => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      if (!data.client || !(data.client in CLIENTS))
+        throw new Error("Invalid client selected.");
+
+      const clientInfo = CLIENTS[data.client];
+      const boardId = clientInfo.boardId;
+      const fileColId = clientInfo.fileColumnId;
+
+      // Create main item via backend
+      const mainItemId = await createMainItem(boardId, data.storeName);
+
+      // If no subitems wanted and boxPic on first screen, upload & attach file via backend
+      if (!data.subitemsWanted && data.screens.length > 0 && data.screens[0].boxPic) {
+        await uploadFileToBackend(data.screens[0].boxPic, data.client, mainItemId);
+      }
+
+      // If subitems wanted, create subitems with uploaded files attached via backend
+      if (data.subitemsWanted) {
+        for (const screen of data.screens) {
+          const subitemId = await createSubitem(mainItemId, screen.name || "Unnamed Screen");
+
+          if (screen.serialPic) {
+            await uploadFileToBackend(screen.serialPic, data.client, subitemId);
+          }
+          if (screen.boxPic) {
+            await uploadFileToBackend(screen.boxPic, data.client, subitemId);
+          }
+        }
+      }
+
+      setSubmitted(true);
+    } catch (err) {
+      console.error("Submission error:", err);
+
+      let message = "Failed to submit to backend";
+
+      if (typeof err === "string") {
+        message = err;
+      } else if (err && typeof err.message === "string") {
+        message = err.message;
+      } else if (err) {
+        try {
+          message = JSON.stringify(err, null, 2);
+        } catch {
+          // fallback to default message
+        }
+      }
+
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    await submitToBackend(formData);
   };
 
   if (submitted) {
     return (
       <div style={styles.container}>
         <div style={styles.form}>
-          <div style={styles.successMessage}>🔥 Your install submission has been received! 🔥</div>
+          <div style={styles.successMessage}>✅ Installation submitted successfully!</div>
           <button
             style={styles.submitButton}
             onClick={() => {
               setSubmitted(false);
               setFormData({
                 client: "",
-                location: "",
                 storeName: "",
                 screens: [],
+                subitemsWanted: false,
               });
             }}
           >
@@ -169,14 +370,15 @@ export default function App() {
 
   return (
     <div style={styles.container}>
-      <form
-        style={styles.form}
-        onSubmit={(e) => {
-          e.preventDefault();
-          handleSubmit();
-        }}
-      >
+      <form style={styles.form} onSubmit={handleSubmit}>
         <h1 style={styles.heading}>Install Submission</h1>
+
+        {error && (
+          <div style={styles.errorMessage}>
+            {typeof error === "string" ? error : JSON.stringify(error, null, 2)}
+          </div>
+        )}
+        {loading && <div style={styles.loading}>Submitting...</div>}
 
         <label htmlFor="client" style={styles.label}>
           Client
@@ -189,24 +391,24 @@ export default function App() {
           required
         >
           <option value="">Select Client</option>
-          <option value="OK Client">OK Client</option>
-          <option value="USave Client">USave Client</option>
-          <option value="Goldwagen Client">Goldwagen Client</option>
-          <option value="PnP Client">PnP Client</option>
+          {Object.keys(CLIENTS).map((client) => (
+            <option key={client} value={client}>
+              {client}
+            </option>
+          ))}
         </select>
 
-        <label htmlFor="location" style={styles.label}>
-          Location
-        </label>
-        <input
-          id="location"
-          type="text"
-          value={formData.location}
-          onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-          placeholder="East Wing"
-          style={styles.input}
-          required
-        />
+        <div style={styles.checkboxRow}>
+          <input
+            type="checkbox"
+            id="subitemsWanted"
+            checked={formData.subitemsWanted}
+            onChange={(e) => setFormData({ ...formData, subitemsWanted: e.target.checked })}
+          />
+          <label htmlFor="subitemsWanted" style={styles.checkboxLabel}>
+            Subitems wanted
+          </label>
+        </div>
 
         <label htmlFor="storeName" style={styles.label}>
           Store Name
@@ -221,52 +423,80 @@ export default function App() {
           required
         />
 
-        <label style={styles.label}>Screens</label>
-        <div style={styles.screensContainer}>
-          {formData.screens.map((screen, idx) => (
-            <div key={idx} style={styles.screenBlock}>
-              <input
-                type="text"
-                value={screen.name}
-                onChange={(e) => updateScreen(idx, "name", e.target.value)}
-                placeholder={`Screen ${idx + 1} name`}
-                style={styles.screenInput}
-                required
-              />
-              <label style={styles.label}>Serial Number Photo</label>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => updateScreen(idx, "serialPic", e.target.files[0])}
-                style={styles.fileInput}
-                required
-              />
-              <label style={styles.label}>Box Photo</label>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => updateScreen(idx, "boxPic", e.target.files[0])}
-                style={styles.fileInput}
-                required
-              />
-              <button
-                type="button"
-                onClick={() => removeScreen(idx)}
-                aria-label={`Remove screen ${idx + 1}`}
-                style={styles.removeButton}
-              >
-                &times; Remove Screen
-              </button>
+        {!formData.subitemsWanted && (
+          <>
+            <label style={styles.label}>Box Photo Upload</label>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  screens: [
+                    {
+                      name: formData.storeName,
+                      serialPic: null,
+                      boxPic: e.target.files[0],
+                    },
+                  ],
+                })
+              }
+              style={styles.fileInput}
+              required
+            />
+          </>
+        )}
+
+        {formData.subitemsWanted && (
+          <>
+            <label style={styles.label}>Screens</label>
+            <div style={styles.screensContainer}>
+              {formData.screens.map((screen, idx) => (
+                <div key={idx} style={styles.screenBlock}>
+                  <input
+                    type="text"
+                    value={screen.name}
+                    onChange={(e) => updateScreen(idx, "name", e.target.value)}
+                    placeholder={`Screen ${idx + 1} name`}
+                    style={styles.screenInput}
+                    required
+                  />
+                  <label style={styles.label}>Serial Number Photo</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => updateScreen(idx, "serialPic", e.target.files[0])}
+                    style={styles.fileInput}
+                    required
+                  />
+                  <label style={styles.label}>Box Photo</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => updateScreen(idx, "boxPic", e.target.files[0])}
+                    style={styles.fileInput}
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeScreen(idx)}
+                    aria-label={`Remove screen ${idx + 1}`}
+                    style={styles.removeButton}
+                  >
+                    &times; Remove Screen
+                  </button>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
 
-        <button type="button" onClick={addScreen} style={styles.addScreenButton}>
-          + Add Screen
-        </button>
+            <button type="button" onClick={addScreen} style={styles.addScreenButton}>
+              + Add Screen
+            </button>
+          </>
+        )}
 
-        <button type="submit" style={styles.submitButton}>
-          Submit
+        <button type="submit" style={styles.submitButton} disabled={loading}>
+          {loading ? "Submitting..." : "Submit"}
         </button>
       </form>
     </div>
